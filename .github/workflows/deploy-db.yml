@@ -24,7 +24,7 @@ env:
   DB_HOST_SSM: /rds-deploy/dev/db-host
   DB_PORT: "5432"
   DB_NAME: appdb
-  LIQUIBASE_VERSION: "4.29.2"
+  LB_VERSION: "4.29.2"
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -45,6 +45,12 @@ jobs:
           role-to-assume: arn:aws:iam::225749317825:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
       - name: Get RDS endpoint from Terraform state
         id: rds
         run: |
@@ -57,6 +63,24 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client
+
+      - name: Verify RDS connectivity
+        run: |
+          echo "Checking connectivity to ${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}..."
+          for i in 1 2 3 4 5; do
+            if pg_isready -h ${{ steps.rds.outputs.db_host }} -p ${{ env.DB_PORT }} -t 5; then
+              echo "RDS is reachable."
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "ERROR: Cannot reach RDS after 5 attempts."
+          echo "Checking security group rules..."
+          aws ec2 describe-security-group-rules \
+            --filters Name=group-id,Values=sg-059b47abd357ac077 \
+            --query 'SecurityGroupRules[?FromPort==`5432`]' --output table
+          exit 1
 
       - name: Create cicd user
         env:
@@ -86,6 +110,12 @@ jobs:
           role-to-assume: arn:aws:iam::225749317825:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
       - name: Get RDS endpoint from Terraform state
         id: rds
         run: |
@@ -101,17 +131,26 @@ jobs:
 
       - name: Install Liquibase
         run: |
-          wget -q "https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.tar.gz"
+          wget -q "https://github.com/liquibase/liquibase/releases/download/v${LB_VERSION}/liquibase-${LB_VERSION}.tar.gz"
           sudo mkdir -p /opt/liquibase
-          sudo tar -xzf "liquibase-${LIQUIBASE_VERSION}.tar.gz" -C /opt/liquibase
+          sudo tar -xzf "liquibase-${LB_VERSION}.tar.gz" -C /opt/liquibase
           sudo ln -sf /opt/liquibase/liquibase /usr/local/bin/liquibase
           liquibase --version
 
-      - name: Download PostgreSQL JDBC driver
+      - name: Verify RDS connectivity
         run: |
-          JDBC_VERSION="42.7.4"
-          wget -q "https://jdbc.postgresql.org/download/postgresql-${JDBC_VERSION}.jar" -O postgresql.jar
-          sudo mv postgresql.jar /opt/liquibase/lib/
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          for i in 1 2 3 4 5; do
+            if pg_isready -h ${{ steps.rds.outputs.db_host }} -p ${{ env.DB_PORT }} -t 5; then
+              echo "RDS is reachable."
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "ERROR: Cannot reach RDS."
+          exit 1
 
       - name: Liquibase Validate
         run: |
@@ -160,6 +199,12 @@ jobs:
           role-to-assume: arn:aws:iam::225749317825:role/GitHubActionsRole
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
       - name: Get RDS endpoint from Terraform state
         id: rds
         run: |
@@ -175,17 +220,26 @@ jobs:
 
       - name: Install Liquibase
         run: |
-          wget -q "https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.tar.gz"
+          wget -q "https://github.com/liquibase/liquibase/releases/download/v${LB_VERSION}/liquibase-${LB_VERSION}.tar.gz"
           sudo mkdir -p /opt/liquibase
-          sudo tar -xzf "liquibase-${LIQUIBASE_VERSION}.tar.gz" -C /opt/liquibase
+          sudo tar -xzf "liquibase-${LB_VERSION}.tar.gz" -C /opt/liquibase
           sudo ln -sf /opt/liquibase/liquibase /usr/local/bin/liquibase
           liquibase --version
 
-      - name: Download PostgreSQL JDBC driver
+      - name: Verify RDS connectivity
         run: |
-          JDBC_VERSION="42.7.4"
-          wget -q "https://jdbc.postgresql.org/download/postgresql-${JDBC_VERSION}.jar" -O postgresql.jar
-          sudo mv postgresql.jar /opt/liquibase/lib/
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          for i in 1 2 3 4 5; do
+            if pg_isready -h ${{ steps.rds.outputs.db_host }} -p ${{ env.DB_PORT }} -t 5; then
+              echo "RDS is reachable."
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "ERROR: Cannot reach RDS."
+          exit 1
 
       - name: Liquibase Update
         run: |
