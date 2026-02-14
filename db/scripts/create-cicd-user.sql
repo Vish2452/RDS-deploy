@@ -1,20 +1,21 @@
 -- =============================================================================
--- Create the cicd user for Liquibase deployments
+-- Create the cicd user for Liquibase deployments (IAM authentication)
 -- Run this once using the master (dbadmin) credentials
 -- =============================================================================
 
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'cicd') THEN
-        EXECUTE format('CREATE ROLE cicd WITH LOGIN PASSWORD %L', current_setting('cicd.password'));
+        CREATE ROLE cicd WITH LOGIN;
         RAISE NOTICE 'Role cicd created.';
     ELSE
-        -- Update password in case it changed
-        EXECUTE format('ALTER ROLE cicd WITH PASSWORD %L', current_setting('cicd.password'));
-        RAISE NOTICE 'Role cicd already exists, password updated.';
+        RAISE NOTICE 'Role cicd already exists.';
     END IF;
 END
 $$;
+
+-- Grant the rds_iam role so cicd can authenticate via IAM auth tokens
+GRANT rds_iam TO cicd;
 
 -- Grant privileges on the target database
 GRANT CONNECT ON DATABASE appdb TO cicd;

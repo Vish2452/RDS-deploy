@@ -66,9 +66,7 @@ jobs:
           PGUSER: dbadmin
           PGPASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
-          psql -v ON_ERROR_STOP=1 \
-            -c "SET cicd.password = '${{ secrets.CICD_DB_PASSWORD }}';" \
-            -f db/scripts/create-cicd-user.sql
+          psql -v ON_ERROR_STOP=1 -f db/scripts/create-cicd-user.sql
 
   # ---------------------------------------------------------------------------
   # Liquibase – Validate (on PRs)
@@ -117,19 +115,29 @@ jobs:
 
       - name: Liquibase Validate
         run: |
+          DB_TOKEN=$(aws rds generate-db-auth-token \
+            --hostname ${{ steps.rds.outputs.db_host }} \
+            --port ${{ env.DB_PORT }} \
+            --username cicd \
+            --region ${{ env.AWS_REGION }})
           liquibase \
-            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}" \
+            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}?sslmode=require" \
             --username=cicd \
-            --password="${{ secrets.CICD_DB_PASSWORD }}" \
+            --password="${DB_TOKEN}" \
             --changelog-file=db/changelog/db.changelog-master.yaml \
             validate
 
       - name: Liquibase Status
         run: |
+          DB_TOKEN=$(aws rds generate-db-auth-token \
+            --hostname ${{ steps.rds.outputs.db_host }} \
+            --port ${{ env.DB_PORT }} \
+            --username cicd \
+            --region ${{ env.AWS_REGION }})
           liquibase \
-            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}" \
+            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}?sslmode=require" \
             --username=cicd \
-            --password="${{ secrets.CICD_DB_PASSWORD }}" \
+            --password="${DB_TOKEN}" \
             --changelog-file=db/changelog/db.changelog-master.yaml \
             status --verbose
 
@@ -181,19 +189,29 @@ jobs:
 
       - name: Liquibase Update
         run: |
+          DB_TOKEN=$(aws rds generate-db-auth-token \
+            --hostname ${{ steps.rds.outputs.db_host }} \
+            --port ${{ env.DB_PORT }} \
+            --username cicd \
+            --region ${{ env.AWS_REGION }})
           liquibase \
-            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}" \
+            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}?sslmode=require" \
             --username=cicd \
-            --password="${{ secrets.CICD_DB_PASSWORD }}" \
+            --password="${DB_TOKEN}" \
             --changelog-file=db/changelog/db.changelog-master.yaml \
             update
 
       - name: Liquibase History
         run: |
+          DB_TOKEN=$(aws rds generate-db-auth-token \
+            --hostname ${{ steps.rds.outputs.db_host }} \
+            --port ${{ env.DB_PORT }} \
+            --username cicd \
+            --region ${{ env.AWS_REGION }})
           liquibase \
-            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}" \
+            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}?sslmode=require" \
             --username=cicd \
-            --password="${{ secrets.CICD_DB_PASSWORD }}" \
+            --password="${DB_TOKEN}" \
             --changelog-file=db/changelog/db.changelog-master.yaml \
             history
 
