@@ -103,9 +103,9 @@ resource "aws_db_instance" "this" {
   iam_database_authentication_enabled = true
 
   # Backups & Maintenance
-  backup_retention_period = var.db_backup_retention_period
-  deletion_protection     = var.db_deletion_protection
-  skip_final_snapshot     = var.db_skip_final_snapshot
+  backup_retention_period   = var.db_backup_retention_period
+  deletion_protection       = var.db_deletion_protection
+  skip_final_snapshot       = var.db_skip_final_snapshot
   final_snapshot_identifier = var.db_skip_final_snapshot ? null : "${var.project_name}-${var.environment}-final-snapshot"
 
   # Storage
@@ -131,8 +131,8 @@ resource "aws_iam_policy" "rds_iam_auth" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = "rds-db:connect"
+        Effect   = "Allow"
+        Action   = "rds-db:connect"
         Resource = "arn:aws:rds-db:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:dbuser:${aws_db_instance.this.resource_id}/${var.db_username}"
       }
     ]
