@@ -114,6 +114,22 @@ jobs:
             --source-group sg-04381b9eaa5f7441d 2>/dev/null || true
           echo "Done."
 
+      - name: Delete old MySQL RDS instance if it exists
+        run: |
+          echo "Checking for existing RDS instance rds-deploy-dev..."
+          if aws rds describe-db-instances --db-instance-identifier rds-deploy-dev 2>/dev/null; then
+            echo "Found old MySQL instance. Deleting (skip final snapshot)..."
+            aws rds delete-db-instance \
+              --db-instance-identifier rds-deploy-dev \
+              --skip-final-snapshot \
+              --delete-automated-backups
+            echo "Waiting for deletion to complete (this may take several minutes)..."
+            aws rds wait db-instance-deleted --db-instance-identifier rds-deploy-dev
+            echo "Old RDS instance deleted."
+          else
+            echo "No existing RDS instance found. Continuing."
+          fi
+
       - name: Terraform Init
         run: terraform init
 
