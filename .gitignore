@@ -1,0 +1,16 @@
+# Ignore terraform state & local files
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Do NOT commit secrets
+*.auto.tfvars
+secret.tfvars
