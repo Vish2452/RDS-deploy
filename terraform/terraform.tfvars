@@ -18,7 +18,7 @@ db_engine_version    = "16.4"
 db_instance_class    = "db.t3.micro"
 db_allocated_storage = 20
 db_name              = "appdb"
-db_username          = "admin"
+db_username          = "dbadmin"
 # db_password is intentionally omitted – pass via TF_VAR_db_password or GitHub secret
 
 db_multi_az            = false
