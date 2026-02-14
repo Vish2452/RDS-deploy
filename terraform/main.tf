@@ -15,7 +15,7 @@ import {
 
 import {
   to = aws_security_group_rule.rds_ingress_from_runner
-  id = "sgrule-3290950651"
+  id = "sg-059b47abd357ac077_ingress_tcp_3306_3306_sg-04381b9eaa5f7441d"
 }
 
 # =============================================================================
