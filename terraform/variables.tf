@@ -38,7 +38,7 @@ variable "security_group_id" {
 variable "db_engine" {
   description = "Database engine (mysql or postgres)"
   type        = string
-  default     = "mysql"
+  default     = "postgres"
 
   validation {
     condition     = contains(["mysql", "postgres"], var.db_engine)

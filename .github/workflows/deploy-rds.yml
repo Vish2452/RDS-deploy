@@ -105,6 +105,25 @@ jobs:
           aws s3api head-bucket --bucket rds-deploy-tf-state-225749317825 2>/dev/null || \
           aws s3api create-bucket --bucket rds-deploy-tf-state-225749317825 --region ${{ env.AWS_REGION }}
 
+      - name: Cleanup orphaned resources from previous MySQL deployment
+        run: |
+          echo "Deleting orphaned SG rule (MySQL 3306)..."
+          aws ec2 revoke-security-group-ingress \
+            --group-id sg-059b47abd357ac077 \
+            --protocol tcp --port 3306 \
+            --source-group sg-04381b9eaa5f7441d 2>/dev/null || true
+
+          echo "Deleting orphaned security group..."
+          aws ec2 delete-security-group --group-id sg-059b47abd357ac077 2>/dev/null || true
+
+          echo "Deleting orphaned DB subnet group..."
+          aws rds delete-db-subnet-group --db-subnet-group-name rds-deploy-dev-subnet-group 2>/dev/null || true
+
+          echo "Clearing stale Terraform state..."
+          aws s3 rm s3://rds-deploy-tf-state-225749317825/rds-deploy/terraform.tfstate 2>/dev/null || true
+
+          echo "Cleanup complete."
+
       - name: Terraform Init
         run: terraform init
 
