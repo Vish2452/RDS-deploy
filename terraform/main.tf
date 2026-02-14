@@ -1,4 +1,24 @@
 # =============================================================================
+# Import existing resources from previous partial apply
+# (safe to keep – Terraform skips imports for resources already in state)
+# =============================================================================
+
+import {
+  to = aws_db_subnet_group.this
+  id = "rds-deploy-dev-subnet-group"
+}
+
+import {
+  to = aws_security_group.rds
+  id = "sg-059b47abd357ac077"
+}
+
+import {
+  to = aws_security_group_rule.rds_ingress_from_runner
+  id = "sgrule-3290950651"
+}
+
+# =============================================================================
 # Data sources – look up existing VPC resources
 # =============================================================================
 

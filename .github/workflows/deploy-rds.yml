@@ -47,6 +47,11 @@ jobs:
         with:
           terraform_version: "1.9.0"
 
+      - name: Ensure S3 state bucket exists
+        run: |
+          aws s3api head-bucket --bucket rds-deploy-tf-state-225749317825 2>/dev/null || \
+          aws s3api create-bucket --bucket rds-deploy-tf-state-225749317825 --region ${{ env.AWS_REGION }}
+
       - name: Terraform Init
         run: terraform init
 
@@ -95,6 +100,11 @@ jobs:
         with:
           terraform_version: "1.9.0"
 
+      - name: Ensure S3 state bucket exists
+        run: |
+          aws s3api head-bucket --bucket rds-deploy-tf-state-225749317825 2>/dev/null || \
+          aws s3api create-bucket --bucket rds-deploy-tf-state-225749317825 --region ${{ env.AWS_REGION }}
+
       - name: Terraform Init
         run: terraform init
 
@@ -135,6 +145,11 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: "1.9.0"
+
+      - name: Ensure S3 state bucket exists
+        run: |
+          aws s3api head-bucket --bucket rds-deploy-tf-state-225749317825 2>/dev/null || \
+          aws s3api create-bucket --bucket rds-deploy-tf-state-225749317825 --region ${{ env.AWS_REGION }}
 
       - name: Terraform Init
         run: terraform init
