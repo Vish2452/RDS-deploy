@@ -6,7 +6,7 @@
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'cicd') THEN
-        CREATE ROLE cicd WITH LOGIN PASSWORD current_setting('cicd.password');
+        EXECUTE format('CREATE ROLE cicd WITH LOGIN PASSWORD %L', current_setting('cicd.password'));
         RAISE NOTICE 'Role cicd created.';
     ELSE
         -- Update password in case it changed
