@@ -1,0 +1,206 @@
+name: Deploy Database (Liquibase)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "db/**"
+      - "liquibase.properties"
+      - ".github/workflows/deploy-db.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "db/**"
+      - "liquibase.properties"
+      - ".github/workflows/deploy-db.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  DB_HOST_SSM: /rds-deploy/dev/db-host
+  DB_PORT: "5432"
+  DB_NAME: appdb
+  LIQUIBASE_VERSION: "4.29.2"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Ensure cicd user exists (runs with master creds)
+  # ---------------------------------------------------------------------------
+  setup-cicd-user:
+    name: Setup CICD DB User
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::225749317825:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get RDS endpoint from Terraform state
+        id: rds
+        run: |
+          cd terraform
+          terraform init -input=false
+          DB_HOST=$(terraform output -raw rds_hostname)
+          echo "db_host=${DB_HOST}" >> "$GITHUB_OUTPUT"
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Create cicd user
+        env:
+          PGHOST: ${{ steps.rds.outputs.db_host }}
+          PGPORT: ${{ env.DB_PORT }}
+          PGDATABASE: ${{ env.DB_NAME }}
+          PGUSER: dbadmin
+          PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          psql -v ON_ERROR_STOP=1 \
+            -c "SET cicd.password = '${{ secrets.CICD_DB_PASSWORD }}';" \
+            -f db/scripts/create-cicd-user.sql
+
+  # ---------------------------------------------------------------------------
+  # Liquibase – Validate (on PRs)
+  # ---------------------------------------------------------------------------
+  liquibase-validate:
+    name: Liquibase Validate
+    runs-on: self-hosted
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::225749317825:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get RDS endpoint from Terraform state
+        id: rds
+        run: |
+          cd terraform
+          terraform init -input=false
+          DB_HOST=$(terraform output -raw rds_hostname)
+          echo "db_host=${DB_HOST}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Java
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq default-jre-headless
+
+      - name: Install Liquibase
+        run: |
+          wget -q "https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.tar.gz"
+          sudo mkdir -p /opt/liquibase
+          sudo tar -xzf "liquibase-${LIQUIBASE_VERSION}.tar.gz" -C /opt/liquibase
+          sudo ln -sf /opt/liquibase/liquibase /usr/local/bin/liquibase
+          liquibase --version
+
+      - name: Download PostgreSQL JDBC driver
+        run: |
+          JDBC_VERSION="42.7.4"
+          wget -q "https://jdbc.postgresql.org/download/postgresql-${JDBC_VERSION}.jar" -O postgresql.jar
+          sudo mv postgresql.jar /opt/liquibase/lib/
+
+      - name: Liquibase Validate
+        run: |
+          liquibase \
+            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}" \
+            --username=cicd \
+            --password="${{ secrets.CICD_DB_PASSWORD }}" \
+            --changelog-file=db/changelog/db.changelog-master.yaml \
+            validate
+
+      - name: Liquibase Status
+        run: |
+          liquibase \
+            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}" \
+            --username=cicd \
+            --password="${{ secrets.CICD_DB_PASSWORD }}" \
+            --changelog-file=db/changelog/db.changelog-master.yaml \
+            status --verbose
+
+  # ---------------------------------------------------------------------------
+  # Liquibase – Update (deploy on push to main)
+  # ---------------------------------------------------------------------------
+  liquibase-update:
+    name: Liquibase Update
+    runs-on: self-hosted
+    needs: setup-cicd-user
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::225749317825:role/GitHubActionsRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get RDS endpoint from Terraform state
+        id: rds
+        run: |
+          cd terraform
+          terraform init -input=false
+          DB_HOST=$(terraform output -raw rds_hostname)
+          echo "db_host=${DB_HOST}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Java
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq default-jre-headless
+
+      - name: Install Liquibase
+        run: |
+          wget -q "https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.tar.gz"
+          sudo mkdir -p /opt/liquibase
+          sudo tar -xzf "liquibase-${LIQUIBASE_VERSION}.tar.gz" -C /opt/liquibase
+          sudo ln -sf /opt/liquibase/liquibase /usr/local/bin/liquibase
+          liquibase --version
+
+      - name: Download PostgreSQL JDBC driver
+        run: |
+          JDBC_VERSION="42.7.4"
+          wget -q "https://jdbc.postgresql.org/download/postgresql-${JDBC_VERSION}.jar" -O postgresql.jar
+          sudo mv postgresql.jar /opt/liquibase/lib/
+
+      - name: Liquibase Update
+        run: |
+          liquibase \
+            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}" \
+            --username=cicd \
+            --password="${{ secrets.CICD_DB_PASSWORD }}" \
+            --changelog-file=db/changelog/db.changelog-master.yaml \
+            update
+
+      - name: Liquibase History
+        run: |
+          liquibase \
+            --url="jdbc:postgresql://${{ steps.rds.outputs.db_host }}:${{ env.DB_PORT }}/${{ env.DB_NAME }}" \
+            --username=cicd \
+            --password="${{ secrets.CICD_DB_PASSWORD }}" \
+            --changelog-file=db/changelog/db.changelog-master.yaml \
+            history
+
+      - name: Summary
+        run: |
+          echo "## Liquibase Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database:** ${{ env.DB_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Host:** ${{ steps.rds.outputs.db_host }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **User:** cicd" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Deployed successfully" >> $GITHUB_STEP_SUMMARY
