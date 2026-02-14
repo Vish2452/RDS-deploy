@@ -1,18 +1,4 @@
 # =============================================================================
-# Import existing resources into state (subnet group & SG are engine-agnostic)
-# =============================================================================
-
-import {
-  to = aws_db_subnet_group.this
-  id = "rds-deploy-dev-subnet-group"
-}
-
-import {
-  to = aws_security_group.rds
-  id = "sg-059b47abd357ac077"
-}
-
-# =============================================================================
 # Data sources – look up existing VPC resources
 # =============================================================================
 
