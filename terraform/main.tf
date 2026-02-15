@@ -152,3 +152,24 @@ resource "aws_iam_role_policy_attachment" "rds_iam_auth" {
   role       = "GitHubActionsRole"
   policy_arn = aws_iam_policy.rds_iam_auth.arn
 }
+
+# =============================================================================
+# Test Resource – SSM Parameter to verify Terraform connectivity
+# =============================================================================
+
+resource "aws_ssm_parameter" "test" {
+  name        = "/${var.project_name}/${var.environment}/test-connection"
+  description = "Test parameter to verify Terraform can deploy to AWS"
+  type        = "String"
+  value       = "Terraform deployment successful – ${timestamp()}"
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-test"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}

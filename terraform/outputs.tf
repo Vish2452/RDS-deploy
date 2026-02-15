@@ -43,3 +43,13 @@ output "rds_iam_auth_policy_arn" {
   description = "ARN of the IAM policy for RDS IAM authentication"
   value       = aws_iam_policy.rds_iam_auth.arn
 }
+
+output "test_ssm_parameter_name" {
+  description = "Name of the test SSM parameter"
+  value       = aws_ssm_parameter.test.name
+}
+
+output "test_ssm_parameter_arn" {
+  description = "ARN of the test SSM parameter"
+  value       = aws_ssm_parameter.test.arn
+}
