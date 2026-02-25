@@ -125,12 +125,102 @@
 - **GitHub CLI** (`gh`) — PR creation, issue management from terminal
 - **Signed commits** with GPG
 
+#### Semantic Versioning (SemVer) — Critical for CI/CD
+
+> **Every production CI/CD pipeline uses SemVer. This is asked in 90%+ DevOps interviews.**
+
+- **Format:** `MAJOR.MINOR.PATCH` → e.g., `v2.4.1`
+  - `MAJOR` — breaking changes (not backward compatible) → `2.0.0`
+  - `MINOR` — new features (backward compatible) → `1.3.0`
+  - `PATCH` — bug fixes (backward compatible) → `1.2.5`
+- **Pre-release labels:** `v1.0.0-alpha.1`, `v1.0.0-beta.2`, `v1.0.0-rc.1`
+- **Build metadata:** `v1.0.0+build.123`, `v1.0.0+20260225`
+- **Version precedence:** `1.0.0-alpha` < `1.0.0-beta` < `1.0.0-rc.1` < `1.0.0`
+
+**SemVer in Real-World CI/CD:**
+| Where | How SemVer Is Used |
+|-------|--------------------|
+| **Git Tags** | `git tag v1.2.3` triggers release pipeline |
+| **Docker Images** | `myapp:1.2.3`, `myapp:1.2`, `myapp:latest` |
+| **Helm Charts** | `version: 1.2.3` in `Chart.yaml` |
+| **Terraform Modules** | Module versioning in registry `source = "app.terraform.io/org/vpc/aws" version = "~> 1.2"` |
+| **npm/pip/Maven** | Package version constraints `^1.2.0`, `~=1.2`, `[1.2,1.3)` |
+| **GitHub Releases** | Auto-generated changelog per version |
+| **Kubernetes manifests** | `image: myapp:v1.2.3` in Deployments |
+| **API versioning** | `/api/v1/`, `/api/v2/` |
+| **Liquibase** | Tag DB state: `liquibase tag v1.2.3` before migration |
+
+**Automated Versioning Tools:**
+| Tool | How It Works |
+|------|--------------|
+| **Conventional Commits** | Commit messages drive version bumps: `feat:` → MINOR, `fix:` → PATCH, `BREAKING CHANGE:` → MAJOR |
+| **semantic-release** | Fully automated: analyzes commits → bumps version → creates tag → publishes release |
+| **Release Please (Google)** | Creates release PRs automatically from conventional commits |
+| **standard-version** | Changelog generation + version bump in one command |
+| **GitVersion** | Calculates version from Git history (branch + tags + commits) |
+
+**Conventional Commits Format:**
+```
+feat: add user registration endpoint          → bumps MINOR (1.2.0 → 1.3.0)
+fix: resolve login timeout issue               → bumps PATCH (1.3.0 → 1.3.1)
+feat!: redesign authentication API             → bumps MAJOR (1.3.1 → 2.0.0)
+chore: update dependencies                     → no version bump
+docs: add API documentation                    → no version bump
+ci: add Trivy scanning to pipeline             → no version bump
+
+feat(api): add pagination to /users endpoint
+^
+│    │     └─ description
+│    └─ optional scope
+└─ type (feat/fix/chore/docs/ci/refactor/test/perf)
+```
+
+**GitHub Actions Release Pipeline Example:**
+```yaml
+name: Release
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: google-github-actions/release-please-action@v4
+        id: release
+        with:
+          release-type: node  # or simple, python, go, etc.
+
+      - name: Build & Push Docker Image
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          VERSION=${{ steps.release.outputs.tag_name }}
+          docker build -t myapp:${VERSION} -t myapp:latest .
+          docker push myapp:${VERSION}
+          docker push myapp:latest
+```
+
+**SemVer Interview Questions:**
+1. When do you bump MAJOR vs MINOR vs PATCH?
+2. How do you automate version bumps in a CI/CD pipeline?
+3. What are conventional commits and how do they drive releases?
+4. How do you handle version pinning in Docker vs Helm vs Terraform?
+5. What's the difference between `^1.2.3`, `~1.2.3`, and `>=1.2.3 <2.0.0`?
+6. How would you implement a release pipeline with automatic changelog?
+7. How do you roll back a bad release using SemVer tags?
+
 ### Real-Time Project: **Team GitFlow Simulation**
 - Create a GitHub org with 3 repos (frontend, backend, infra)
 - Branch protection rules, required reviews, status checks
 - Simulate feature development → PR → code review → merge → release tagging
+- **Implement semantic versioning with conventional commits + Release Please**
+- **Auto-generate changelogs and GitHub Releases on merge to main**
 - Practice conflict resolution and hotfix flow
-- Deliverable: Documented branching strategy + working repo with history
+- Deliverable: Documented branching strategy + working repo with SemVer releases
 
 ---
 
@@ -436,7 +526,7 @@ Deployment Side:
 | 3 | **Kubernetes Deploy** | Build → Push → Update K8s manifest → Deploy to EKS |
 | 4 | **Serverless Deploy** | Test → Package → Deploy Lambda via SAM/CDK |
 | 5 | **Security Scan** | Trivy image scan + SonarQube analysis |
-| 6 | **Release Pipeline** | Semantic versioning → Changelog → GitHub Release |
+| 6 | **Release Pipeline** | Conventional Commits → semantic-release / Release Please → auto-tag → Changelog → GitHub Release → Docker tag |
 | 7 | **Multi-Env Deploy** | Dev → Staging → Manual Approval → Production |
 | 8 | **Scheduled Cleanup** | Cron-based AWS resource cleanup |
 
@@ -661,7 +751,8 @@ GitHub Actions Runner (EC2)
 7. How to run Liquibase with IAM database authentication on RDS?
 8. How to share common changesets across multiple microservice databases?
 
-- **Deliverable:** Fully automated DB migration pipeline with rollback capability, IAM auth, and multi-environment support
+- Tag each release with SemVer: `liquibase tag v1.2.3` before and after migrations
+- **Deliverable:** Fully automated DB migration pipeline with rollback capability, IAM auth, SemVer tagging, and multi-environment support
 
 ---
 
