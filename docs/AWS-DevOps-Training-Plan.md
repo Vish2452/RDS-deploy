@@ -1,7 +1,7 @@
 # AWS DevOps Engineer — Complete Training Plan (2026 Edition)
 
 > **Goal:** End-to-end hands-on training with **real-time projects per topic**.  
-> **Duration:** ~16–20 weeks (adjustable).  
+> **Duration:** ~18–22 weeks (adjustable).  
 > **Approach:** Each module ends with a deployable project; projects build on each other so that by the end the trainee has a **production-grade portfolio**.
 
 ---
@@ -19,10 +19,12 @@
 | 7 | Jenkins CI/CD | 1.5 weeks | Full pipeline: build → test → scan → deploy |
 | 8 | GitHub Actions CI/CD | 1 week | OIDC-based Terraform + app deployment |
 | 9 | Terraform (IaC) | 2 weeks | Multi-env infra with modules & remote state |
+| 9A | **Liquibase (DB Migrations)** | 1 week | RDS schema CI/CD with GitHub Actions |
 | 10 | Kubernetes | 3 weeks | Production EKS cluster with monitoring |
 | 11 | Monitoring & Observability | 1 week | Prometheus + Grafana + EFK on K8s |
 | 12 | Security & Compliance | 0.5 week | DevSecOps pipeline with SonarQube + Trivy |
-| 13 | Capstone Project | 1 week | End-to-end banking/e-commerce app |
+| 13 | **Lambda + Glue + Data Infra** | 1.5 weeks | Serverless ETL pipeline + Data Lake |
+| 14 | Capstone Projects | 1.5 weeks | CDP / E-Commerce / Banking (pick one) |
 
 ---
 
@@ -494,6 +496,175 @@ Deployment Side:
 
 ---
 
+## MODULE 9A — Liquibase: Database Schema Management & CI/CD ⭐ (1 Week)
+
+> **Real-world projects always need database migration tooling. This module uses YOUR existing RDS-deploy project as the training lab!**
+
+### Why Liquibase?
+- Manual SQL scripts don't track state — Liquibase does
+- Version-controlled, repeatable, auditable database changes
+- Integrates into CI/CD pipelines (GitHub Actions, Jenkins)
+- Supports rollback, tagging, diff, and drift detection
+- Industry alternatives: Flyway, Atlas, golang-migrate, Alembic (Python)
+
+### Topics
+
+#### Liquibase Fundamentals
+- **Architecture** — changelog, changeset, DATABASECHANGELOG tracking table
+- **Changelog formats:**
+  - SQL formatted (`--liquibase formatted sql`) ← most common in DevOps
+  - YAML
+  - XML
+  - JSON
+- **Master changelog** — `db.changelog-master.yaml` includes individual files
+- **Changeset anatomy:**
+  - `--changeset author:id` — unique identifier
+  - `labels` and `context` — selective execution
+  - `--rollback` — undo SQL for every changeset
+  - `--preconditions` — conditional execution
+  - `runOnChange`, `runAlways` — re-runnable changesets
+  - `--comment` — documentation
+
+#### Liquibase Commands
+| Command | Purpose |
+|---------|---------|
+| `liquibase update` | Apply pending changesets |
+| `liquibase rollback` | Rollback to a tag or count |
+| `liquibase rollbackCount N` | Rollback last N changesets |
+| `liquibase tag <tagName>` | Tag current state for rollback |
+| `liquibase status` | Show pending changesets |
+| `liquibase validate` | Validate changelog syntax |
+| `liquibase diff` | Compare two databases |
+| `liquibase generateChangeLog` | Reverse-engineer existing DB |
+| `liquibase history` | Show applied changesets |
+| `liquibase changelogSync` | Mark changesets as applied without running |
+| `liquibase dropAll` | Drop all objects (DEV only!) |
+| `liquibase snapshot` | Capture current DB state |
+| `liquibase updateSQL` | Preview SQL without executing (dry run) |
+
+#### Configuration
+- **`liquibase.properties`** — connection URL, credentials, changelog path
+- **Environment variables** — `LIQUIBASE_COMMAND_URL`, `LIQUIBASE_COMMAND_USERNAME`
+- **Command-line overrides** — `--url`, `--username`, `--password`, `--changelog-file`
+- **Connection via IAM Auth Token** (AWS RDS) — generate token, pass as password
+
+#### Best Practices
+- **One changeset = one logical change** (never combine unrelated DDL)
+- **Always write rollback SQL** — essential for production safety
+- **Never modify an applied changeset** — Liquibase checksums will fail
+- **Use `runOnChange` for views, stored procs, functions** — they're idempotent
+- **Use contexts** — separate dev seed data from production schema
+- **Tag before every release** — enables precise rollback
+- **Naming convention:** `NNN-description.sql` (e.g., `001-initial-schema.sql`)
+
+### Practical Exercises (8 Hands-On Labs)
+
+| # | Lab | What You Learn |
+|---|-----|----------------|
+| 1 | **Setup Liquibase locally** | Install CLI, connect to local PostgreSQL, run first `update` |
+| 2 | **Create schema from scratch** | Users, orders, products tables with indexes — same as your RDS-deploy project |
+| 3 | **Write rollback SQL** | Rollback each changeset, practice `rollbackCount`, `rollback --tag` |
+| 4 | **Add columns, modify schema** | `ALTER TABLE`, add `status` enum, default values — migration evolution |
+| 5 | **Seed data with contexts** | Insert test data using `context:dev`, skip in `context:prod` |
+| 6 | **IAM Auth with AWS RDS** | Generate auth token, connect Liquibase to RDS PostgreSQL (your project!) |
+| 7 | **Diff two databases** | Compare dev vs staging, generate differential changelog |
+| 8 | **CI/CD integration** | Build GitHub Actions workflow: validate on PR → update on merge |
+
+### Real-Time Project: **Liquibase CI/CD for RDS PostgreSQL** (Uses Your Existing Repo!)
+
+**This project directly uses the `RDS-deploy` codebase as the training environment.**
+
+#### Project Architecture
+```
+GitHub Repo (RDS-deploy)
+│
+├── db/
+│   ├── changelog/
+│   │   ├── db.changelog-master.yaml        # Master changelog
+│   │   └── changelogs/
+│   │       ├── 001-initial-schema.sql       # users + orders tables
+│   │       ├── 002-test-connection.sql      # connectivity test
+│   │       ├── 003-test-rds.sql             # products table
+│   │       ├── 004-add-categories.sql       # NEW: categories table
+│   │       ├── 005-add-user-profiles.sql    # NEW: user profiles
+│   │       ├── 006-add-audit-log.sql        # NEW: audit trail
+│   │       ├── 007-create-views.sql         # NEW: reporting views (runOnChange)
+│   │       └── 008-seed-data.sql            # NEW: dev seed data (context:dev)
+│   └── scripts/
+│       └── create-cicd-user.sql             # IAM-auth DB user
+│
+├── .github/workflows/
+│   ├── deploy-rds.yml                       # Terraform infra pipeline
+│   └── deploy-db.yml                        # Liquibase migration pipeline
+│
+├── liquibase.properties                     # Config file
+└── terraform/                               # RDS infrastructure
+```
+
+#### Pipeline Flow (Already in Your Repo!)
+```
+Pull Request:
+  → Liquibase validate (syntax check)
+  → Liquibase status (show pending changes)
+  → Liquibase updateSQL (dry-run preview)
+  → Reviewers approve SQL changes
+
+Merge to main:
+  → Setup CICD user (IAM auth)
+  → Liquibase tag (pre-release checkpoint)
+  → Liquibase update (apply migrations)
+  → Liquibase history (confirm applied)
+  → Smoke test (query tables)
+
+Rollback (manual dispatch):
+  → Liquibase rollbackCount N
+  → Verify rollback
+  → Notify team
+```
+
+#### What Trainees Build
+1. Extend the existing `RDS-deploy` schema with 5 new changesets
+2. Write proper rollback SQL for every changeset
+3. Use `context:dev` for seed data, `context:prod` for schema-only
+4. Add a `runOnChange` view for order reporting
+5. Practice rollback to a tagged state
+6. Run the full CI/CD pipeline via GitHub Actions
+7. Generate a diff between local and RDS databases
+8. Handle a "checksum mismatch" error (intentionally break and fix)
+
+#### Liquibase + IAM Auth Token Flow (AWS-Specific)
+```
+GitHub Actions Runner (EC2)
+  │
+  ├── OIDC → AWS STS → GitHubActionsRole
+  │
+  ├── aws rds generate-db-auth-token \
+  │     --hostname <rds-endpoint> \
+  │     --port 5432 \
+  │     --region us-east-1 \
+  │     --username cicd
+  │
+  └── liquibase update \
+        --url jdbc:postgresql://<rds-endpoint>:5432/appdb?sslmode=require \
+        --username cicd \
+        --password <IAM_AUTH_TOKEN> \
+        --changelog-file db/changelog/db.changelog-master.yaml
+```
+
+#### Interview Questions: Liquibase & DB Migrations
+1. How does Liquibase track which changesets have been applied?
+2. What happens if you modify an already-applied changeset?
+3. How to handle a failed migration in production?
+4. Liquibase vs Flyway — differences and when to use each?
+5. How to rollback a specific changeset without rolling back later ones?
+6. What is `DATABASECHANGELOGLOCK` and why does it exist?
+7. How to run Liquibase with IAM database authentication on RDS?
+8. How to share common changesets across multiple microservice databases?
+
+- **Deliverable:** Fully automated DB migration pipeline with rollback capability, IAM auth, and multi-environment support
+
+---
+
 ## MODULE 10 — Kubernetes (3 Weeks)
 
 ### Week 1: Fundamentals
@@ -639,9 +810,224 @@ Deployment Side:
 
 ---
 
-## MODULE 13 — Capstone Project (1 Week)
+## MODULE 13 — Lambda + Glue + Serverless Data Infrastructure ⭐ (1.5 Weeks)
 
-### **End-to-End Serverless Banking Application**
+> **Data Engineering on AWS is a top-demand skill in 2026. Every DevOps engineer needs to know how to deploy and manage serverless data pipelines.**
+
+### Part A: AWS Lambda — Production Infrastructure Setup
+
+#### Topics
+- **Lambda architecture** — execution environment, cold starts, runtime lifecycle
+- **Lambda function deployment:**
+  - ZIP deployment package
+  - Container image deployment (ECR-based Lambda)
+  - SAM (Serverless Application Model) vs CDK vs raw Terraform
+- **Lambda infrastructure with Terraform:**
+  - `aws_lambda_function` — runtime, handler, memory, timeout, VPC config
+  - `aws_lambda_permission` — allow triggers from API Gateway, S3, etc.
+  - `aws_lambda_event_source_mapping` — SQS, DynamoDB Streams, Kinesis
+  - `aws_lambda_layer_version` — shared dependencies
+  - `aws_cloudwatch_log_group` — Lambda log retention
+- **Lambda networking:**
+  - Lambda in VPC — access RDS, ElastiCache from Lambda
+  - Lambda + NAT Gateway — internet access from VPC Lambda
+  - Lambda + VPC Endpoints — private access to S3, DynamoDB, Secrets Manager
+- **API Gateway integration:**
+  - REST API vs HTTP API — cost and feature differences
+  - Lambda proxy integration
+  - API Gateway stages, throttling, API keys
+  - Custom domain + ACM certificate
+- **Event-driven patterns:**
+  - S3 event → Lambda (file processing)
+  - SQS → Lambda (queue processing with batch size, DLQ)
+  - EventBridge → Lambda (scheduled tasks, event routing)
+  - DynamoDB Streams → Lambda (change data capture)
+  - SNS → Lambda (fan-out pattern)
+- **Lambda best practices:**
+  - Environment variables + Secrets Manager integration
+  - Provisioned concurrency for latency-sensitive workloads
+  - Lambda PowerTools (logging, tracing, metrics)
+  - Dead letter queues (DLQ) for failed invocations
+  - Lambda Destinations — onSuccess/onFailure routing
+
+#### Lambda Practical Labs
+| # | Lab | What You Build |
+|---|-----|----------------|
+| 1 | **S3 Image Processor** | S3 upload → Lambda resizes image → saves to output bucket |
+| 2 | **API Gateway + Lambda CRUD** | REST API for a todo app backed by DynamoDB |
+| 3 | **SQS Order Processor** | Orders queue → Lambda processes → writes to RDS |
+| 4 | **Scheduled Cost Reporter** | EventBridge cron → Lambda queries Cost Explorer → SNS email |
+| 5 | **VPC Lambda + RDS** | Lambda in VPC connects to RDS PostgreSQL with IAM auth |
+
+### Part B: AWS Glue — Serverless ETL & Data Infrastructure
+
+#### Topics
+- **What is AWS Glue** — serverless ETL (Extract, Transform, Load) service
+- **Glue components:**
+  - **Glue Data Catalog** — centralized metadata store (Hive-compatible)
+  - **Glue Crawlers** — auto-discover schema from S3, RDS, DynamoDB
+  - **Glue Jobs** — ETL scripts (PySpark or Python shell)
+  - **Glue Triggers** — schedule or event-based job execution
+  - **Glue Workflows** — orchestrate multiple crawlers and jobs
+  - **Glue Schema Registry** — Avro/JSON schema versioning
+- **Glue infrastructure with Terraform:**
+  ```hcl
+  # Key Terraform resources
+  aws_glue_catalog_database     # Create Glue database
+  aws_glue_crawler               # Auto-discover S3/RDS schema
+  aws_glue_job                   # ETL job (PySpark/Python)
+  aws_glue_trigger               # Schedule or event trigger
+  aws_glue_workflow              # Orchestrate crawlers + jobs
+  aws_glue_connection            # JDBC connection to RDS/Redshift
+  aws_iam_role                   # Glue service role
+  ```
+- **Glue + S3 Data Lake pattern:**
+  ```
+  Raw Zone (S3)  →  Glue Crawler  →  Data Catalog
+       ↓                                    ↓
+  Glue ETL Job  →  Processed Zone (S3)  →  Athena Queries
+       ↓                                    ↓
+  Curated Zone (S3)  →  Redshift / QuickSight
+  ```
+- **Glue job types:**
+  - Spark ETL — large-scale data processing
+  - Python Shell — lightweight transformations
+  - Glue Streaming — real-time with Kafka/Kinesis
+- **Glue Data Quality** — rule-based data validation
+- **Glue + Lake Formation** — fine-grained access control for data lake
+- **Cost optimization** — DPU allocation, job bookmarks, partition pushdown
+
+#### Glue Practical Labs
+| # | Lab | What You Build |
+|---|-----|----------------|
+| 1 | **S3 Crawler + Athena** | Crawl CSV files in S3 → query with Athena SQL |
+| 2 | **CSV to Parquet ETL** | Glue job converts raw CSV → optimized Parquet in S3 |
+| 3 | **RDS to S3 Export** | Glue JDBC connection → extract RDS data → write to S3 data lake |
+| 4 | **Data Quality Checks** | Validate data completeness, uniqueness, and format rules |
+| 5 | **Workflow Orchestration** | Crawler → ETL Job → Crawler → trigger notification |
+
+### Part C: Step Functions — Serverless Orchestration
+
+#### Topics
+- **State machines** — definition, states, transitions
+- **State types:** Task, Choice, Parallel, Map, Wait, Pass, Succeed, Fail
+- **Standard vs Express** workflows — duration, cost, use cases
+- **Integration patterns:** Lambda, Glue, ECS, SQS, SNS, DynamoDB, Bedrock
+- **Error handling** — Retry, Catch, Fallback states
+- **Terraform deployment** of Step Functions
+
+### Real-Time Project: **Serverless Data Pipeline with Lambda + Glue + Step Functions**
+
+**Architecture:**
+```
+                    ┌─────────────────────────────────────────┐
+                    │         Step Functions Orchestrator      │
+                    │                                         │
+S3 Raw Upload ──►   │  ① Lambda: Validate file format         │
+                    │  ② Glue Crawler: Discover schema         │
+                    │  ③ Glue ETL Job: Transform & clean data  │
+                    │  ④ Lambda: Data quality check             │
+                    │  ⑤ Glue Job: Load to curated zone        │
+                    │  ⑥ Lambda: Send SNS notification         │
+                    │                                         │
+                    └─────────────────────────────────────────┘
+                              ↓              ↓
+                        Athena Queries   CloudWatch Dashboard
+
+Infrastructure: 100% Terraform
+CI/CD: GitHub Actions
+Monitoring: CloudWatch + SNS alerts
+```
+
+**What Trainees Build:**
+1. Terraform modules for Lambda, Glue, Step Functions, S3, IAM
+2. S3 bucket structure: `raw/`, `processed/`, `curated/` zones
+3. Glue Crawler for auto-schema discovery
+4. Glue PySpark ETL job for data transformation
+5. Step Functions state machine to orchestrate the pipeline
+6. Lambda functions for validation and notification
+7. Athena queries on the curated data
+8. GitHub Actions pipeline to deploy all infrastructure
+9. CloudWatch alarms for job failures
+- **Deliverable:** Production-ready serverless ETL pipeline deployed via Terraform + GitHub Actions
+
+---
+
+## MODULE 14 — Capstone Projects (1.5 Weeks)
+
+> **Pick ONE of the four projects below. Each is a real-world, interview-ready project that demonstrates end-to-end DevOps skills.**
+
+---
+
+### CAPSTONE OPTION A: Customer Data Platform (CDP) ⭐
+
+> **CDPs are the #1 trending data project in 2026. Companies like Segment, mParticle, and Rudderstack are billion-dollar businesses built on this pattern.**
+
+**What is a CDP?**
+A system that collects customer data from multiple sources (web, mobile, CRM, transactions), unifies it into a single customer profile, and makes it available for analytics, marketing, and personalization.
+
+**Architecture:**
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                        CDP Architecture                              │
+│                                                                      │
+│  DATA INGESTION                                                      │
+│  ─────────────                                                       │
+│  Web Events ──► API Gateway ──► Lambda ──► Kinesis Data Stream      │
+│  Mobile App ──► API Gateway ──► Lambda ──► Kinesis Data Stream      │
+│  CRM Export ──► S3 Upload   ──► S3 Event ──► Lambda ──► Kinesis     │
+│  DB Changes ──► DynamoDB Streams ──► Lambda ──► Kinesis             │
+│                                          ↓                           │
+│  PROCESSING LAYER                                                    │
+│  ─────────────────                                                   │
+│  Kinesis ──► Kinesis Firehose ──► S3 Raw Zone                       │
+│                   ↓                                                  │
+│  Step Functions Orchestrator:                                        │
+│    ① Glue Crawler → discover new event schemas                      │
+│    ② Glue ETL → deduplicate, validate, enrich                      │
+│    ③ Lambda → identity resolution (merge customer profiles)         │
+│    ④ Glue ETL → build unified customer profile                     │
+│    ⑤ Lambda → update DynamoDB (real-time profile store)             │
+│    ⑥ Glue ETL → write to curated S3 (analytics)                    │
+│                                          ↓                           │
+│  DATA STORAGE                                                        │
+│  ────────────                                                        │
+│  S3 Data Lake:  raw/ → processed/ → curated/                        │
+│  DynamoDB:      unified_customer_profiles (real-time access)         │
+│  RDS PostgreSQL: reporting database (via Liquibase migrations!)      │
+│                                          ↓                           │
+│  CONSUMPTION LAYER                                                   │
+│  ──────────────────                                                  │
+│  Athena:        Ad-hoc SQL queries on S3 data                        │
+│  QuickSight:    Dashboards & visualizations                          │
+│  API Gateway:   Profile API → Lambda → DynamoDB (real-time lookup)  │
+│  SNS/SQS:       Trigger marketing campaigns on profile changes       │
+│                                                                      │
+│  INFRASTRUCTURE                                                      │
+│  ──────────────                                                      │
+│  Terraform:     All resources in reusable modules                    │
+│  GitHub Actions: CI/CD for infra + Lambda code + Glue scripts       │
+│  Liquibase:     RDS reporting schema migrations                      │
+│  Monitoring:    CloudWatch + Prometheus/Grafana (if EKS components)  │
+│  Security:      KMS encryption, IAM least privilege, VPC, WAF       │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**AWS Services Used:** API Gateway, Lambda, Kinesis Data Streams, Kinesis Firehose, S3, Glue (Crawler + ETL + Catalog), Step Functions, DynamoDB, RDS PostgreSQL, Athena, SNS, SQS, KMS, IAM, VPC, CloudWatch, Route 53, CloudFront
+
+**DevOps Skills Demonstrated:**
+- Terraform modules (15+ resources)
+- GitHub Actions CI/CD (3 workflows: infra, app, data)
+- Liquibase for RDS schema management
+- Docker for Lambda container images
+- Monitoring with CloudWatch dashboards and alarms
+- Security: encryption at rest/transit, least privilege IAM, VPC endpoints
+
+**Deliverable:** Working CDP that ingests events, builds unified customer profiles, and exposes them via API + analytics
+
+---
+
+### CAPSTONE OPTION B: End-to-End Serverless Banking Application
 
 **Architecture:**
 ```
@@ -653,11 +1039,17 @@ User → Route 53 → CloudFront → S3 (React Frontend)
                                              → SQS (Transaction Queue)
 Infrastructure: Terraform modules
 CI/CD: GitHub Actions (OIDC)
-Monitoring: CloudWatch + Prometheus/Grafana (for EKS variant)
+DB Migrations: Liquibase → RDS PostgreSQL
+Monitoring: CloudWatch + SNS alerts
 Security: KMS encryption, IAM least privilege, WAF
 ```
 
-**OR — Microservices E-Commerce on EKS:**
+**Deliverable:** Full banking app with account management, transaction processing, and reporting
+
+---
+
+### CAPSTONE OPTION C: Microservices E-Commerce on EKS
+
 ```
 User → Route 53 → ALB → NGINX Ingress → EKS Cluster
   ├── Product Service (Node.js)
@@ -668,9 +1060,38 @@ User → Route 53 → ALB → NGINX Ingress → EKS Cluster
 
 Infrastructure: Terraform (VPC, EKS, RDS)
 CI/CD: GitHub Actions → Docker Build → ECR → ArgoCD → EKS
+DB Migrations: Liquibase for each microservice DB
 Monitoring: Prometheus + Grafana + Loki
 Security: Network Policies, RBAC, Trivy, SonarQube
 ```
+
+**Deliverable:** Production-grade EKS microservices with GitOps deployment
+
+---
+
+### CAPSTONE OPTION D: Real-Time IoT Analytics Platform (Industry 4.0)
+
+> **IoT + Data Engineering is booming in manufacturing, logistics, and smart cities.**
+
+**Architecture:**
+```
+IoT Sensors → IoT Core → Kinesis Data Stream → Lambda (real-time alerts)
+                                              → Kinesis Firehose → S3 Raw
+                                                                    ↓
+                                              Glue Crawler → Glue ETL Job
+                                                                    ↓
+                                              S3 Curated → Athena → QuickSight
+                                              
+  Time-series DB:  Timestream (or InfluxDB on EKS)
+  Real-time Dashboard: Grafana + CloudWatch
+  Alerting: SNS + PagerDuty integration
+
+Infrastructure: Terraform
+CI/CD: GitHub Actions
+DB Migrations: Liquibase (reporting RDS)
+```
+
+**Deliverable:** IoT data pipeline with real-time alerting and historical analytics
 
 ---
 
@@ -680,9 +1101,14 @@ Security: Network Policies, RBAC, Trivy, SonarQube
 
 | Topic | Why It's Important | Where to Cover |
 |-------|--------------------|----------------|
-| **GitHub Actions** | Replacing Jenkins in many orgs | New Module 8 |
+| **GitHub Actions** | Replacing Jenkins in many orgs | Module 8 |
+| **Liquibase DB Migrations** | Every production app needs schema CI/CD | Module 9A |
 | **ArgoCD / GitOps** | Modern K8s deployment pattern | Module 10 (K8s) |
 | **Helm Charts** | K8s package management | Module 10 (K8s) |
+| **AWS Lambda (Production)** | Serverless compute is default in 2026 | Module 13 |
+| **AWS Glue + Data Lake** | Data engineering is highest-demand skill | Module 13 |
+| **Step Functions** | Serverless orchestration for pipelines | Module 13 |
+| **CDP (Customer Data Platform)** | Trending real-time project in industry | Module 14 (Capstone) |
 | **AWS Secrets Manager + External Secrets Operator** | Modern secrets management | Module 4 & 10 |
 | **AWS Identity Center (SSO)** | Multi-account access | Module 4 (IAM) |
 | **Service Mesh (Istio/Linkerd)** | Microservice communication | Module 10 (Advanced) |
@@ -693,27 +1119,48 @@ Security: Network Policies, RBAC, Trivy, SonarQube
 | **Infrastructure Testing (Terratest)** | Test IaC code | Module 9 |
 | **Dependabot + Renovate** | Automated dependency updates | Module 8 (GH Actions) |
 | **AWS CDK** | Alternative IaC (awareness level) | Module 9 (Brief) |
-| **Platform Engineering basics** | Internal Developer Platforms | Module 13 |
+| **Platform Engineering basics** | Internal Developer Platforms | Module 14 |
+| **Kinesis Data Streams / Firehose** | Real-time streaming ingestion | Module 13 |
+| **Amazon Athena** | Serverless SQL on S3 data lake | Module 13 |
+| **AWS Lake Formation** | Data lake governance | Module 13 |
+| **Amazon EventBridge** | Event-driven architecture hub | Module 13 |
 
-### AWS Services Missing from Your List (Added)
+### AWS Services Missing from Your List (Now Added)
 
-| Service | Category | Importance |
-|---------|----------|------------|
-| **AWS Organizations & SCPs** | Governance | High — multi-account strategy |
-| **AWS Identity Center (SSO)** | IAM | High — modern access management |
-| **AWS Secrets Manager** | Security | High — secrets rotation |
-| **AWS Systems Manager (SSM)** | Operations | High — Session Manager, Parameter Store |
-| **AWS Config** | Compliance | Medium — resource compliance rules |
-| **AWS GuardDuty** | Security | Medium — threat detection |
-| **AWS WAF** | Security | Medium — web app firewall |
-| **AWS ECS + Fargate** | Compute | High — serverless containers |
-| **AWS ECR** | Containers | High — Docker image registry |
-| **AWS CodePipeline/CodeBuild** | CI/CD | Medium — AWS-native CI/CD awareness |
-| **AWS DynamoDB** | Database | Medium — serverless NoSQL |
-| **AWS SQS** | Messaging | Medium — message queuing |
-| **AWS Step Functions** | Orchestration | Medium — serverless workflows |
-| **AWS Athena** | Analytics | Low — query S3 data with SQL |
-| **AWS Cost Explorer** | FinOps | High — cost analysis |
+| Service | Category | Importance | Module |
+|---------|----------|------------|--------|
+| **AWS Organizations & SCPs** | Governance | High — multi-account strategy | 4 |
+| **AWS Identity Center (SSO)** | IAM | High — modern access management | 4 |
+| **AWS Secrets Manager** | Security | High — secrets rotation | 4, 9A |
+| **AWS Systems Manager (SSM)** | Operations | High — Session Manager, Parameter Store | 4 |
+| **AWS Config** | Compliance | Medium — resource compliance rules | 12 |
+| **AWS GuardDuty** | Security | Medium — threat detection | 12 |
+| **AWS WAF** | Security | Medium — web app firewall | 12 |
+| **AWS ECS + Fargate** | Compute | High — serverless containers | 4, 6 |
+| **AWS ECR** | Containers | High — Docker image registry | 6, 8 |
+| **AWS CodePipeline/CodeBuild** | CI/CD | Medium — AWS-native CI/CD awareness | 8 |
+| **AWS DynamoDB** | Database | High — serverless NoSQL | 4, 13, 14 |
+| **AWS SQS** | Messaging | High — message queuing | 4, 13 |
+| **AWS Step Functions** | Orchestration | High — serverless workflows | 13 |
+| **AWS Glue** | Data Engineering | High — serverless ETL | 13 |
+| **AWS Kinesis** | Streaming | High — real-time data ingestion | 13, 14 |
+| **Amazon Athena** | Analytics | High — query S3 data with SQL | 13 |
+| **AWS Lake Formation** | Data Governance | Medium — data lake permissions | 13 |
+| **Amazon EventBridge** | Event Bus | High — event-driven routing | 13 |
+| **AWS Cost Explorer** | FinOps | High — cost analysis | 2, 4 |
+
+### 2026 Industry Trend: What Companies Are Hiring For
+
+| Trend | Why It Matters | Covered In |
+|-------|---------------|------------|
+| **Data Engineering + DevOps = DataOps** | Companies need DevOps engineers who can deploy data pipelines | Module 13 |
+| **Customer Data Platforms (CDP)** | Unified customer view is top priority for enterprises | Module 14 |
+| **Serverless-first architectures** | Lambda + Glue + Step Functions replacing EC2 for many workloads | Module 13 |
+| **Platform Engineering** | Internal Developer Platforms (IDPs) are the next evolution of DevOps | Module 14 |
+| **GitOps with ArgoCD** | Declarative K8s deployments replacing imperative scripts | Module 10 |
+| **FinOps / Cloud Cost Optimization** | Every company is cutting cloud spend | Module 2, 4 |
+| **AI/ML Pipeline Deployment** | Deploying ML models (SageMaker, Bedrock) is a DevOps responsibility | Awareness |
+| **Database-as-Code (Liquibase/Flyway)** | Schema changes in CI/CD, not manual SQL scripts | Module 9A |
 
 ---
 
@@ -755,7 +1202,7 @@ Security: Network Policies, RBAC, Trivy, SonarQube
 
 - [ ] AWS Free Tier account (or training account)
 - [ ] GitHub account with Actions enabled
-- [ ] VS Code + extensions (Docker, Terraform, YAML, K8s)
+- [ ] VS Code + extensions (Docker, Terraform, YAML, K8s, Liquibase)
 - [ ] Docker Desktop (or Rancher Desktop)
 - [ ] Terraform CLI installed
 - [ ] kubectl + eksctl installed
@@ -763,7 +1210,36 @@ Security: Network Policies, RBAC, Trivy, SonarQube
 - [ ] Minikube or kind for local K8s
 - [ ] Jenkins (Docker container for lab use)
 - [ ] Helm CLI installed
+- [ ] Liquibase CLI installed (`brew install liquibase` / download from liquibase.org)
+- [ ] PostgreSQL client (`psql`) installed
+- [ ] Python 3.10+ (for Glue scripts, Lambda functions)
+- [ ] SAM CLI (for local Lambda testing)
+- [ ] AWS Glue local development container (Docker)
 
 ---
 
-*Generated: February 25, 2026 | Based on current industry requirements*
+## Real-Time Project Portfolio Summary
+
+> After completing all modules, trainees will have these deployable projects:
+
+| # | Project | Key Services | Interview Value |
+|---|---------|-------------|----------------|
+| 1 | Server Hardening Script | Linux, SSH, iptables | Shows Linux depth |
+| 2 | AWS Cost Optimization Script | Shell, AWS CLI, SNS | FinOps is hot |
+| 3 | GitFlow Team Simulation | Git, GitHub, PRs | Collaboration proof |
+| 4 | Scalable 3-Tier Web App | VPC, ALB, ASG, RDS, S3 | Core AWS competency |
+| 5 | Multi-Region VPC Network | Transit GW, VPC, VPN | Networking expertise |
+| 6 | Docker Voting App + Trivy | Docker, Compose, ECR | Container skills |
+| 7 | Jenkins Java Pipeline | Jenkins, SonarQube, ECR | CI/CD pipeline design |
+| 8 | GitHub Actions CI/CD | GH Actions, OIDC, Terraform | Modern CI/CD |
+| 9 | Terraform Multi-Env Infra | Terraform, S3, modules | IaC mastery |
+| **9A** | **Liquibase RDS Pipeline** | **Liquibase, RDS, GH Actions** | **DB-as-Code (unique skill!)** |
+| 10 | Production EKS Cluster | EKS, Helm, Ingress, HPA | K8s production readiness |
+| 11 | Observability Stack | Prometheus, Grafana, EFK | Monitoring culture |
+| 12 | DevSecOps Pipeline | Trivy, SonarQube, Checkov | Security-first mindset |
+| **13** | **Serverless Data Pipeline** | **Lambda, Glue, Step Functions** | **DataOps + Serverless** |
+| **14** | **CDP / Banking / E-Commerce** | **Full stack (15+ services)** | **Capstone portfolio piece** |
+
+---
+
+*Generated: February 25, 2026 | Updated with Liquibase, Lambda, Glue, CDP, and 2026 industry trends*
