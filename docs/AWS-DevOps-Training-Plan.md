@@ -1,8 +1,11 @@
-# AWS DevOps Engineer — Complete Training Plan (2026 Edition)
+# DevOps by Doing — AWS DevOps Bootcamp (2026 Edition)
+
+> *Real pipelines. Real infrastructure. Real projects.*
 
 > **Goal:** End-to-end hands-on training with **real-time projects per topic**.  
 > **Duration:** ~18–22 weeks (adjustable).  
-> **Approach:** Each module ends with a deployable project; projects build on each other so that by the end the trainee has a **production-grade portfolio**.
+> **Approach:** Each module ends with a deployable project; projects build on each other so that by the end the trainee has a **production-grade portfolio**.  
+> **Philosophy:** Learn by building — no passive lectures, every concept is practiced on live AWS infrastructure.
 
 ---
 
